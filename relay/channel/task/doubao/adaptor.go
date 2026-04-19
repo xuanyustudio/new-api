@@ -269,20 +269,59 @@ func (a *TaskAdaptor) GetChannelName() string {
 
 func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*requestPayload, error) {
 	r := requestPayload{
-		Model:   req.Model,
-		Content: []ContentItem{},
+		Model: req.Model,
 	}
 
-	// Add images if present
-	if req.HasImage() {
-		for _, imgURL := range req.Images {
-			r.Content = append(r.Content, ContentItem{
-				Type: "image_url",
-				ImageURL: &MediaURL{
-					URL: imgURL,
-				},
-			})
+	// Use Content array if provided
+	if len(req.Content) > 0 {
+		for _, item := range req.Content {
+			contentItem := ContentItem{}
+			if t, ok := item["type"].(string); ok {
+				contentItem.Type = t
+			}
+			if text, ok := item["text"].(string); ok {
+				contentItem.Text = text
+			}
+			if imageURL, ok := item["image_url"].(map[string]interface{}); ok {
+				if url, ok := imageURL["url"].(string); ok {
+					contentItem.ImageURL = &MediaURL{URL: url}
+				}
+			}
+			if videoURL, ok := item["video_url"].(map[string]interface{}); ok {
+				if url, ok := videoURL["url"].(string); ok {
+					contentItem.VideoURL = &MediaURL{URL: url}
+				}
+			}
+			if audioURL, ok := item["audio_url"].(map[string]interface{}); ok {
+				if url, ok := audioURL["url"].(string); ok {
+					contentItem.AudioURL = &MediaURL{URL: url}
+				}
+			}
+			if role, ok := item["role"].(string); ok {
+				contentItem.Role = role
+			}
+			r.Content = append(r.Content, contentItem)
 		}
+	} else {
+		r.Content = []ContentItem{}
+
+		// Add images if present
+		if req.HasImage() {
+			for _, imgURL := range req.Images {
+				r.Content = append(r.Content, ContentItem{
+					Type: "image_url",
+					ImageURL: &MediaURL{
+						URL: imgURL,
+					},
+				})
+			}
+		}
+
+		r.Content = lo.Reject(r.Content, func(c ContentItem, _ int) bool { return c.Type == "text" })
+		r.Content = append(r.Content, ContentItem{
+			Type: "text",
+			Text: req.Prompt,
+		})
 	}
 
 	metadata := req.Metadata
@@ -294,11 +333,24 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq) (*
 		r.Duration = lo.ToPtr(dto.IntValue(sec))
 	}
 
-	r.Content = lo.Reject(r.Content, func(c ContentItem, _ int) bool { return c.Type == "text" })
-	r.Content = append(r.Content, ContentItem{
-		Type: "text",
-		Text: req.Prompt,
-	})
+	if req.Duration > 0 {
+		r.Duration = lo.ToPtr(dto.IntValue(req.Duration))
+	}
+	if req.Ratio != "" {
+		r.Ratio = req.Ratio
+	}
+	if req.AspectRatio != "" {
+		r.Ratio = req.AspectRatio
+	}
+	if req.Resolution != "" {
+		r.Resolution = req.Resolution
+	}
+	if req.GenerateAudio != nil {
+		r.GenerateAudio = lo.ToPtr(dto.BoolValue(*req.GenerateAudio))
+	}
+	if req.Watermark != nil {
+		r.Watermark = lo.ToPtr(dto.BoolValue(*req.Watermark))
+	}
 
 	return &r, nil
 }
