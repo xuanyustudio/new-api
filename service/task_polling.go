@@ -377,14 +377,15 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	snap := task.Snapshot()
 
 	taskResult := &relaycommon.TaskInfo{}
-	// try parse as New API response format
-	var responseItems dto.TaskResponse[model.Task]
+	// try parse as New API response format（必须用 TaskDto：model.Task 的 PrivateData 为 json:"-"，
+	// 上游 JSON 顶层的 result_url 无法反序列化进 PrivateData，会导致 Url 为空并错误回退为 BuildProxyURL 自引用）
+	var responseItems dto.TaskResponse[dto.TaskDto]
 	if err = common.Unmarshal(responseBody, &responseItems); err == nil && responseItems.IsSuccess() {
 		logger.LogDebug(ctx, fmt.Sprintf("updateVideoSingleTask parsed as new api response format: %+v", responseItems))
 		t := responseItems.Data
 		taskResult.TaskID = t.TaskID
-		taskResult.Status = string(t.Status)
-		taskResult.Url = t.GetResultURL()
+		taskResult.Status = t.Status
+		taskResult.Url = t.ResultURL
 		taskResult.Progress = t.Progress
 		taskResult.Reason = t.FailReason
 		task.Data = t.Data
