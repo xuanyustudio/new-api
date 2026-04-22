@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -22,6 +23,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 )
+
+func isVolcEngineOfficial(baseURL string) bool {
+	return strings.HasPrefix(baseURL, "https://ark.") || strings.HasPrefix(baseURL, "https://visual.")
+}
 
 // ============================
 // Request / Response structures
@@ -121,7 +126,10 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 
 // BuildRequestURL constructs the upstream URL.
 func (a *TaskAdaptor) BuildRequestURL(_ *relaycommon.RelayInfo) (string, error) {
-	return fmt.Sprintf("%s/api/v3/contents/generations/tasks", a.baseURL), nil
+	if isVolcEngineOfficial(a.baseURL) {
+		return fmt.Sprintf("%s/api/v3/contents/generations/tasks", a.baseURL), nil
+	}
+	return fmt.Sprintf("%s/v1/video/generations", a.baseURL), nil
 }
 
 // BuildRequestHeader sets required headers.
@@ -241,7 +249,12 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 		return nil, fmt.Errorf("invalid task_id")
 	}
 
-	uri := fmt.Sprintf("%s/api/v3/contents/generations/tasks/%s", baseUrl, taskID)
+	var uri string
+	if isVolcEngineOfficial(baseUrl) {
+		uri = fmt.Sprintf("%s/api/v3/contents/generations/tasks/%s", baseUrl, taskID)
+	} else {
+		uri = fmt.Sprintf("%s/v1/video/generations/%s", baseUrl, taskID)
+	}
 
 	req, err := http.NewRequest(http.MethodGet, uri, nil)
 	if err != nil {
