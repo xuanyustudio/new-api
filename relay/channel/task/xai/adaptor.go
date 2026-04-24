@@ -2,6 +2,7 @@ package xai
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -222,21 +223,96 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 type upstreamQueryResp struct {
 	Status   string  `json:"status"`
 	VideoURL *string `json:"video_url"`
-	Message  string  `json:"message,omitempty"`
-	Error    *struct {
-		Message string `json:"message"`
-	} `json:"error,omitempty"`
+
+	// Some upstreams return message at top-level.
+	Message string `json:"message,omitempty"`
+
+	// Some upstreams return error as a plain string, others as an object.
+	Error any `json:"error,omitempty"`
+}
+
+func extractErrorMessage(errField any) string {
+	if errField == nil {
+		return ""
+	}
+	switch v := errField.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case map[string]interface{}:
+		return extractErrorMessageFromMap(v)
+	default:
+		// Best-effort stringification, but keep it conservative to avoid noisy reasons.
+		return ""
+	}
+}
+
+func extractErrorMessageFromMap(v map[string]interface{}) string {
+	if msg, ok := v["message"].(string); ok && strings.TrimSpace(msg) != "" {
+		return strings.TrimSpace(msg)
+	}
+	if inner, ok := v["error"].(map[string]interface{}); ok {
+		if msg, ok := inner["message"].(string); ok && strings.TrimSpace(msg) != "" {
+			return strings.TrimSpace(msg)
+		}
+	}
+	return ""
+}
+
+func normalizeStatus(s string) string {
+	return strings.ToLower(strings.TrimSpace(s))
+}
+
+func upstreamQueryHasSignal(up upstreamQueryResp) bool {
+	return normalizeStatus(up.Status) != "" ||
+		up.Error != nil ||
+		up.VideoURL != nil ||
+		strings.TrimSpace(up.Message) != ""
+}
+
+// parseXAIUpstreamQuery parses query JSON whether fields are at top-level or nested under "data"
+// (some upstreams / proxies wrap payloads as {"data":{...}}).
+func parseXAIUpstreamQuery(respBody []byte) (upstreamQueryResp, error) {
+	var up upstreamQueryResp
+	if err := common.Unmarshal(respBody, &up); err != nil {
+		return up, err
+	}
+	if upstreamQueryHasSignal(up) {
+		return up, nil
+	}
+	var wrap struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := common.Unmarshal(respBody, &wrap); err != nil {
+		return up, nil
+	}
+	if len(wrap.Data) == 0 || string(wrap.Data) == "null" {
+		return up, nil
+	}
+	var inner upstreamQueryResp
+	if err := common.Unmarshal(wrap.Data, &inner); err != nil {
+		return up, nil
+	}
+	if upstreamQueryHasSignal(inner) {
+		return inner, nil
+	}
+	return up, nil
 }
 
 func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, error) {
-	var up upstreamQueryResp
-	if err := common.Unmarshal(respBody, &up); err != nil {
+	up, err := parseXAIUpstreamQuery(respBody)
+	if err != nil {
 		return nil, errors.Wrap(err, "unmarshal task result failed")
 	}
 
 	taskResult := relaycommon.TaskInfo{Code: 0}
 
-	switch strings.ToLower(strings.TrimSpace(up.Status)) {
+	status := normalizeStatus(up.Status)
+	reason := strings.TrimSpace(up.Message)
+	if reason == "" {
+		reason = extractErrorMessage(up.Error)
+	}
+
+	switch status {
 	case "pending", "queued", "submitted":
 		taskResult.Status = model.TaskStatusQueued
 	case "processing", "in_progress", "running":
@@ -249,22 +325,22 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 				taskResult.Url = u
 			}
 		}
-	case "failed", "cancelled", "error":
+	case "failed", "failure", "cancelled", "canceled", "error":
 		taskResult.Status = model.TaskStatusFailure
-		switch {
-		case strings.TrimSpace(up.Message) != "":
-			taskResult.Reason = strings.TrimSpace(up.Message)
-		case up.Error != nil && strings.TrimSpace(up.Error.Message) != "":
-			taskResult.Reason = strings.TrimSpace(up.Error.Message)
-		default:
+		if reason != "" {
+			taskResult.Reason = reason
+		} else {
 			taskResult.Reason = "task failed"
 		}
 	default:
-		if strings.TrimSpace(up.Status) == "" {
-			taskResult.Status = model.TaskStatusInProgress
-		} else {
-			taskResult.Status = model.TaskStatusInProgress
+		// If upstream returns an error message but omits/changes status,
+		// fail fast so the task doesn't get stuck in polling.
+		if reason != "" {
+			taskResult.Status = model.TaskStatusFailure
+			taskResult.Reason = reason
+			return &taskResult, nil
 		}
+		taskResult.Status = model.TaskStatusInProgress
 	}
 
 	return &taskResult, nil
@@ -280,11 +356,9 @@ func (a *TaskAdaptor) GetChannelName() string {
 
 func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, error) {
 	openAIVideo := originTask.ToOpenAIVideo()
-	var up upstreamQueryResp
-	if err := common.Unmarshal(originTask.Data, &up); err == nil {
-		if up.VideoURL != nil && strings.TrimSpace(*up.VideoURL) != "" {
-			openAIVideo.SetMetadata("url", strings.TrimSpace(*up.VideoURL))
-		}
+	up, err := parseXAIUpstreamQuery(originTask.Data)
+	if err == nil && up.VideoURL != nil && strings.TrimSpace(*up.VideoURL) != "" {
+		openAIVideo.SetMetadata("url", strings.TrimSpace(*up.VideoURL))
 	}
 	return common.Marshal(openAIVideo)
 }
