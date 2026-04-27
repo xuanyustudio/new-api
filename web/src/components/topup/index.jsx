@@ -39,6 +39,7 @@ import InvitationCard from './InvitationCard';
 import TransferModal from './modals/TransferModal';
 import PaymentConfirmModal from './modals/PaymentConfirmModal';
 import TopupHistoryModal from './modals/TopupHistoryModal';
+import AffInviteesModal from './modals/AffInviteesModal';
 
 const TopUp = () => {
   const { t } = useTranslation();
@@ -95,6 +96,7 @@ const TopUp = () => {
 
   // 账单Modal状态
   const [openHistory, setOpenHistory] = useState(false);
+  const [openInvitees, setOpenInvitees] = useState(false);
 
   // 订阅相关
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
@@ -844,6 +846,14 @@ const TopUp = () => {
     setOpenHistory(false);
   };
 
+  const handleOpenInvitees = () => {
+    setOpenInvitees(true);
+  };
+
+  const handleInviteesCancel = () => {
+    setOpenInvitees(false);
+  };
+
   const handleCreemCancel = () => {
     setCreemOpen(false);
     setSelectedCreemProduct(null);
@@ -909,6 +919,12 @@ const TopUp = () => {
       <TopupHistoryModal
         visible={openHistory}
         onCancel={handleHistoryCancel}
+        t={t}
+      />
+
+      <AffInviteesModal
+        visible={openInvitees}
+        onCancel={handleInviteesCancel}
         t={t}
       />
 
@@ -994,6 +1010,7 @@ const TopUp = () => {
           setOpenTransfer={setOpenTransfer}
           affLink={affLink}
           handleAffLinkClick={handleAffLinkClick}
+          handleOpenInvitees={handleOpenInvitees}
         />
       </div>
     </div>

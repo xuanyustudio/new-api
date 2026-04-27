@@ -38,6 +38,7 @@ const InvitationCard = ({
   setOpenTransfer,
   affLink,
   handleAffLinkClick,
+  handleOpenInvitees,
 }) => {
   return (
     <Card className='!rounded-2xl shadow-sm border-0'>
@@ -191,6 +192,11 @@ const InvitationCard = ({
               </Button>
             }
           />
+          <div className='mt-3 flex justify-end'>
+            <Button type='tertiary' onClick={handleOpenInvitees}>
+              {t('查看明细')}
+            </Button>
+          </div>
         </Card>
 
         {/* 奖励说明 */}
