@@ -763,6 +763,7 @@ type TaskInfo struct {
 	Url              string `json:"url,omitempty"`
 	RemoteUrl        string `json:"remote_url,omitempty"`
 	Progress         string `json:"progress,omitempty"`
+	PromptTokens     int    `json:"prompt_tokens,omitempty"`     // 用量展示 / 日志
 	CompletionTokens int    `json:"completion_tokens,omitempty"` // 用于按倍率计费
 	TotalTokens      int    `json:"total_tokens,omitempty"`      // 用于按倍率计费
 }

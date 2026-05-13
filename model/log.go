@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -253,15 +254,17 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 }
 
 type RecordTaskBillingLogParams struct {
-	UserId    int
-	LogType   int
-	Content   string
-	ChannelId int
-	ModelName string
-	Quota     int
-	TokenId   int
-	Group     string
-	Other     map[string]interface{}
+	UserId             int
+	LogType            int
+	Content            string
+	ChannelId          int
+	ModelName          string
+	Quota              int
+	TokenId            int
+	Group              string
+	Other              map[string]interface{}
+	PromptTokens       int
+	CompletionTokens   int
 }
 
 func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
@@ -276,23 +279,74 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		}
 	}
 	log := &Log{
-		UserId:    params.UserId,
-		Username:  username,
-		CreatedAt: common.GetTimestamp(),
-		Type:      params.LogType,
-		Content:   params.Content,
-		TokenName: tokenName,
-		ModelName: params.ModelName,
-		Quota:     params.Quota,
-		ChannelId: params.ChannelId,
-		TokenId:   params.TokenId,
-		Group:     params.Group,
-		Other:     common.MapToJsonStr(params.Other),
+		UserId:           params.UserId,
+		Username:         username,
+		CreatedAt:        common.GetTimestamp(),
+		Type:             params.LogType,
+		Content:          params.Content,
+		TokenName:        tokenName,
+		ModelName:        params.ModelName,
+		Quota:            params.Quota,
+		PromptTokens:     params.PromptTokens,
+		CompletionTokens: params.CompletionTokens,
+		ChannelId:        params.ChannelId,
+		TokenId:          params.TokenId,
+		Group:            params.Group,
+		Other:            common.MapToJsonStr(params.Other),
 	}
 	err := LOG_DB.Create(log).Error
 	if err != nil {
 		common.SysLog("failed to record task billing log: " + err.Error())
 	}
+}
+
+func logOtherIsTaskFlag(v any) bool {
+	switch t := v.(type) {
+	case bool:
+		return t
+	case float64:
+		return t != 0
+	case string:
+		return t == "true" || t == "1"
+	default:
+		return false
+	}
+}
+
+// TryPatchTaskConsumeLogTokens 将任务完成后的 token 用量写回提交时记录的消费日志（匹配 other.public_task_id）。
+func TryPatchTaskConsumeLogTokens(userId int, publicTaskID string, promptTokens, completionTokens int) bool {
+	if publicTaskID == "" || (promptTokens <= 0 && completionTokens <= 0) {
+		return false
+	}
+	var logs []Log
+	err := LOG_DB.Where("user_id = ? AND type = ?", userId, LogTypeConsume).
+		Order("id desc").Limit(80).Find(&logs).Error
+	if err != nil {
+		return false
+	}
+	for i := range logs {
+		otherMap, e := common.StrToMap(logs[i].Other)
+		if e != nil || otherMap == nil {
+			continue
+		}
+		if !logOtherIsTaskFlag(otherMap["is_task"]) {
+			continue
+		}
+		ptid := ""
+		if v, ok := otherMap["public_task_id"]; ok && v != nil {
+			ptid = strings.TrimSpace(fmt.Sprint(v))
+		}
+		if ptid != publicTaskID {
+			continue
+		}
+		errUp := LOG_DB.Model(&Log{}).Where("id = ?", logs[i].Id).
+			Updates(map[string]any{
+				"prompt_tokens":     promptTokens,
+				"completion_tokens": completionTokens,
+			}).Error
+		return errUp == nil
+	}
+	return false
 }
 
 func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, requestId string) (logs []*Log, total int64, err error) {
