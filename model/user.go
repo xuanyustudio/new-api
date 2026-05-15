@@ -1048,6 +1048,18 @@ func updateUserUsedQuota(id int, quota int) {
 	}
 }
 
+// AdjustUserUsedQuota 仅调整用户累计已用额度（不修改请求次数），用于异步任务退款、差额退还等。
+func AdjustUserUsedQuota(id int, delta int) {
+	if delta == 0 {
+		return
+	}
+	if common.BatchUpdateEnabled {
+		addNewRecord(BatchUpdateTypeUsedQuota, id, delta)
+		return
+	}
+	updateUserUsedQuota(id, delta)
+}
+
 func updateUserRequestCount(id int, count int) {
 	err := DB.Model(&User{}).Where("id = ?", id).Update("request_count", gorm.Expr("request_count + ?", count)).Error
 	if err != nil {

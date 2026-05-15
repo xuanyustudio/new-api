@@ -498,7 +498,7 @@ type Stat struct {
 }
 
 func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string) (stat Stat, err error) {
-	tx := LOG_DB.Table("logs").Select("sum(quota) quota")
+	tx := LOG_DB.Table("logs")
 
 	// 为rpm和tpm创建单独的查询
 	rpmTpmQuery := LOG_DB.Table("logs").Select("count(*) rpm, sum(prompt_tokens) + sum(completion_tokens) tpm")
@@ -534,7 +534,18 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 		rpmTpmQuery = rpmTpmQuery.Where(logGroupCol+" = ?", group)
 	}
 
-	tx = tx.Where("type = ?", LogTypeConsume)
+	switch logType {
+	case LogTypeUnknown:
+		// 全部：净消耗 = 消费额度之和 − 异步退款（type=6）之和
+		tx = tx.Select("COALESCE(SUM(CASE WHEN type = ? THEN quota WHEN type = ? THEN -quota ELSE 0 END), 0) AS quota", LogTypeConsume, LogTypeRefund)
+	case LogTypeConsume:
+		tx = tx.Select("COALESCE(SUM(quota), 0) AS quota").Where("type = ?", LogTypeConsume)
+	case LogTypeRefund:
+		tx = tx.Select("COALESCE(SUM(quota), 0) AS quota").Where("type = ?", LogTypeRefund)
+	default:
+		tx = tx.Select("COALESCE(SUM(quota), 0) AS quota").Where("type = ?", logType)
+	}
+
 	rpmTpmQuery = rpmTpmQuery.Where("type = ?", LogTypeConsume)
 
 	// 只统计最近60秒的rpm和tpm

@@ -168,6 +168,12 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 	// 2. 退还令牌额度
 	taskAdjustTokenQuota(ctx, task, -quota)
 
+	// 与提交时 LogTaskConsumption 的已用统计对齐：预扣退还后扣减累计已用与渠道已用
+	model.AdjustUserUsedQuota(task.UserId, -quota)
+	if task.ChannelId > 0 {
+		model.UpdateChannelUsedQuota(task.ChannelId, -quota)
+	}
+
 	// 3. 记录日志
 	other := taskBillingOther(task)
 	other["task_id"] = task.TaskID
@@ -279,6 +285,10 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	} else {
 		logType = model.LogTypeRefund
 		logQuota = -quotaDelta
+		model.AdjustUserUsedQuota(task.UserId, quotaDelta)
+		if task.ChannelId > 0 {
+			model.UpdateChannelUsedQuota(task.ChannelId, quotaDelta)
+		}
 	}
 	other := taskBillingOther(task)
 	other["task_id"] = task.TaskID
