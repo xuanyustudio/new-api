@@ -42,12 +42,14 @@ type ChannelOtherSettings struct {
 	UpstreamModelUpdateLastRemovedModels  []string      `json:"upstream_model_update_last_removed_models,omitempty"`  // 上次检测到的可删除模型
 	UpstreamModelUpdateIgnoredModels      []string      `json:"upstream_model_update_ignored_models,omitempty"`       // 手动忽略的模型
 	VolcengineVideoAPIStyle               string        `json:"volcengine_video_api_style,omitempty"`                 // 火山视频 API 协议：auto / official / openai
-	MegabyaiFacePass                      *bool         `json:"megabyai_face_pass,omitempty"`                        // megabyai：参考图过人脸（nil/true=开，false=关）
+	VolcengineAssetAuth                   *bool         `json:"volcengine_asset_auth,omitempty"`                      // 火山/星辰视频：创建前把媒体 URL 换成 asset://
+	VolcengineAssetGroupID                string        `json:"volcengine_asset_group_id,omitempty"`                  // 素材组 ID；空则按渠道自动创建并复用
+	MegabyaiFacePass                      *bool         `json:"megabyai_face_pass,omitempty"`                         // megabyai：参考图过人脸（nil/true=开，false=关）
 	MegabyaiFaceSingleEye                 *bool         `json:"megabyai_face_single_eye,omitempty"`                   // megabyai：单眼遮挡（nil/true=开，false=双眼）
-	MegabyaiFaceSize                      *int          `json:"megabyai_face_size,omitempty"`                        // megabyai：遮挡尺寸 1–10（nil=5）
-	OpenaiFacePass                        *bool         `json:"openai_face_pass,omitempty"`                          // OpenAI/Sora 视频：参考图过人脸（nil/true=开，false=关）
+	MegabyaiFaceSize                      *int          `json:"megabyai_face_size,omitempty"`                         // megabyai：遮挡尺寸 1–10（nil=5）
+	OpenaiFacePass                        *bool         `json:"openai_face_pass,omitempty"`                           // OpenAI/Sora 视频：参考图过人脸（nil/true=开，false=关）
 	OpenaiFaceSingleEye                   *bool         `json:"openai_face_single_eye,omitempty"`                     // OpenAI/Sora：单眼遮挡（nil/true=开，false=双眼）
-	OpenaiFaceSize                        *int          `json:"openai_face_size,omitempty"`                          // OpenAI/Sora：遮挡尺寸 1–10（nil=5）
+	OpenaiFaceSize                        *int          `json:"openai_face_size,omitempty"`                           // OpenAI/Sora：遮挡尺寸 1–10（nil=5）
 }
 
 func (s *ChannelOtherSettings) IsOpenRouterEnterprise() bool {

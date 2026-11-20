@@ -101,6 +101,8 @@ export interface ChannelOtherSettings {
   allow_speed?: boolean
   claude_beta_query?: boolean
   volcengine_video_api_style?: 'auto' | 'official' | 'openai'
+  volcengine_asset_auth?: boolean
+  volcengine_asset_group_id?: string
   megabyai_face_pass?: boolean
   megabyai_face_single_eye?: boolean
   megabyai_face_size?: number

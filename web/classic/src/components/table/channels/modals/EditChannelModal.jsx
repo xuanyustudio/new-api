@@ -234,6 +234,8 @@ const EditChannelModal = (props) => {
     allow_speed: false,
     claude_beta_query: false,
     volcengine_video_api_style: 'auto',
+    volcengine_asset_auth: false,
+    volcengine_asset_group_id: '',
     megabyai_face_pass: true,
     megabyai_face_single_eye: true,
     megabyai_face_size: 5,
@@ -1070,6 +1072,12 @@ const EditChannelModal = (props) => {
           } else {
             data.volcengine_video_api_style = 'auto';
           }
+          data.volcengine_asset_auth =
+            parsedSettings.volcengine_asset_auth === true;
+          data.volcengine_asset_group_id =
+            typeof parsedSettings.volcengine_asset_group_id === 'string'
+              ? parsedSettings.volcengine_asset_group_id
+              : '';
           data.megabyai_face_pass = parsedSettings.megabyai_face_pass !== false;
           data.megabyai_face_single_eye =
             parsedSettings.megabyai_face_single_eye !== false;
@@ -1121,6 +1129,8 @@ const EditChannelModal = (props) => {
           data.allow_speed = false;
           data.claude_beta_query = false;
           data.volcengine_video_api_style = 'auto';
+          data.volcengine_asset_auth = false;
+          data.volcengine_asset_group_id = '';
           data.megabyai_face_pass = true;
           data.megabyai_face_single_eye = true;
           data.megabyai_face_size = 5;
@@ -1146,6 +1156,8 @@ const EditChannelModal = (props) => {
         data.allow_speed = false;
         data.claude_beta_query = false;
         data.volcengine_video_api_style = 'auto';
+        data.volcengine_asset_auth = false;
+        data.volcengine_asset_group_id = '';
         data.megabyai_face_pass = true;
         data.megabyai_face_single_eye = true;
         data.megabyai_face_size = 5;
@@ -1232,6 +1244,9 @@ const EditChannelModal = (props) => {
         data.claude_beta_query ||
         (data.volcengine_video_api_style &&
           data.volcengine_video_api_style !== 'auto') ||
+        data.volcengine_asset_auth ||
+        (data.volcengine_asset_group_id &&
+          String(data.volcengine_asset_group_id).trim()) ||
         data.system_prompt_override;
       if (hasAdvancedValues) {
         setAdvancedSettingsOpen(true);
@@ -2006,8 +2021,29 @@ const EditChannelModal = (props) => {
       } else if ('volcengine_video_api_style' in settings) {
         delete settings.volcengine_video_api_style;
       }
-    } else if ('volcengine_video_api_style' in settings) {
-      delete settings.volcengine_video_api_style;
+      if (localInputs.volcengine_asset_auth === true) {
+        settings.volcengine_asset_auth = true;
+      } else if ('volcengine_asset_auth' in settings) {
+        delete settings.volcengine_asset_auth;
+      }
+      const assetGroupId = String(
+        localInputs.volcengine_asset_group_id || '',
+      ).trim();
+      if (assetGroupId) {
+        settings.volcengine_asset_group_id = assetGroupId;
+      } else if ('volcengine_asset_group_id' in settings) {
+        delete settings.volcengine_asset_group_id;
+      }
+    } else {
+      if ('volcengine_video_api_style' in settings) {
+        delete settings.volcengine_video_api_style;
+      }
+      if ('volcengine_asset_auth' in settings) {
+        delete settings.volcengine_asset_auth;
+      }
+      if ('volcengine_asset_group_id' in settings) {
+        delete settings.volcengine_asset_group_id;
+      }
     }
 
     // type === 65 (megabyai): face-pass (default on) + mask params
@@ -2104,6 +2140,8 @@ const EditChannelModal = (props) => {
     delete localInputs.allow_speed;
     delete localInputs.claude_beta_query;
     delete localInputs.volcengine_video_api_style;
+    delete localInputs.volcengine_asset_auth;
+    delete localInputs.volcengine_asset_group_id;
     delete localInputs.megabyai_face_pass;
     delete localInputs.megabyai_face_single_eye;
     delete localInputs.megabyai_face_size;
@@ -3961,6 +3999,42 @@ const EditChannelModal = (props) => {
                             )}
                             disabled={isIonetLocked}
                           />
+                          <Form.Switch
+                            field='volcengine_asset_auth'
+                            label={t('创建前资产认证')}
+                            checkedText={t('开')}
+                            uncheckedText={t('关')}
+                            checked={inputs.volcengine_asset_auth === true}
+                            onChange={(value) =>
+                              handleChannelOtherSettingsChange(
+                                'volcengine_asset_auth',
+                                value,
+                              )
+                            }
+                            extraText={t(
+                              '开启后，图片、视频、音频会先调用素材资产管理接口拿到素材 ID，再以 asset:// 替换原链接并创建视频。已是 asset:// 的保持不变。素材组留空时自动创建并在进程内复用。',
+                            )}
+                            disabled={isIonetLocked}
+                          />
+                          {inputs.volcengine_asset_auth === true && (
+                            <Form.Input
+                              field='volcengine_asset_group_id'
+                              label={t('素材组 ID')}
+                              placeholder='group-20260520175050-cskhp'
+                              value={inputs.volcengine_asset_group_id || ''}
+                              onChange={(value) =>
+                                handleChannelOtherSettingsChange(
+                                  'volcengine_asset_group_id',
+                                  value,
+                                )
+                              }
+                              extraText={t(
+                                '可选，例如 group-20260520175050-cskhp。留空则自动创建并复用。',
+                              )}
+                              showClear
+                              disabled={isIonetLocked}
+                            />
+                          )}
                         </div>
                       )}
                     </div>

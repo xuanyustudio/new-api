@@ -77,6 +77,8 @@ export const channelFormSchema = z.object({
   volcengine_video_api_style: z
     .enum(['auto', 'official', 'openai'])
     .optional(), // VolcEngine/DoubaoVideo: video API path style
+  volcengine_asset_auth: z.boolean().optional(),
+  volcengine_asset_group_id: z.string().optional(),
   megabyai_face_pass: z.boolean().optional(), // megabyai: face-pass (default on)
   megabyai_face_single_eye: z.boolean().optional(), // megabyai: single-eye mask (default on)
   megabyai_face_size: z.number().int().min(1).max(10).optional(), // megabyai: mask size 1-10 (default 5)
@@ -142,6 +144,8 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   allow_speed: false,
   claude_beta_query: false,
   volcengine_video_api_style: 'auto',
+  volcengine_asset_auth: false,
+  volcengine_asset_group_id: '',
   megabyai_face_pass: true,
   megabyai_face_single_eye: true,
   megabyai_face_size: 5,
@@ -203,6 +207,8 @@ export function transformChannelToFormDefaults(
   let allowSpeed = false
   let claudeBetaQuery = false
   let volcengineVideoApiStyle: 'auto' | 'official' | 'openai' = 'auto'
+  let volcengineAssetAuth = false
+  let volcengineAssetGroupId = ''
   let megabyaiFacePass = true
   let megabyaiFaceSingleEye = true
   let megabyaiFaceSize = 5
@@ -233,6 +239,11 @@ export function transformChannelToFormDefaults(
       ) {
         volcengineVideoApiStyle = parsed.volcengine_video_api_style
       }
+      volcengineAssetAuth = parsed.volcengine_asset_auth === true
+      volcengineAssetGroupId =
+        typeof parsed.volcengine_asset_group_id === 'string'
+          ? parsed.volcengine_asset_group_id
+          : ''
       // nil / missing => on; only explicit false turns off
       megabyaiFacePass = parsed.megabyai_face_pass !== false
       megabyaiFaceSingleEye = parsed.megabyai_face_single_eye !== false
@@ -307,6 +318,8 @@ export function transformChannelToFormDefaults(
     allow_speed: allowSpeed,
     claude_beta_query: claudeBetaQuery,
     volcengine_video_api_style: volcengineVideoApiStyle,
+    volcengine_asset_auth: volcengineAssetAuth,
+    volcengine_asset_group_id: volcengineAssetGroupId,
     megabyai_face_pass: megabyaiFacePass,
     megabyai_face_single_eye: megabyaiFaceSingleEye,
     megabyai_face_size: megabyaiFaceSize,
@@ -423,8 +436,27 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
     } else if ('volcengine_video_api_style' in settingsObj) {
       delete settingsObj.volcengine_video_api_style
     }
-  } else if ('volcengine_video_api_style' in settingsObj) {
-    delete settingsObj.volcengine_video_api_style
+    if (formData.volcengine_asset_auth === true) {
+      settingsObj.volcengine_asset_auth = true
+    } else if ('volcengine_asset_auth' in settingsObj) {
+      delete settingsObj.volcengine_asset_auth
+    }
+    const assetGroupId = formData.volcengine_asset_group_id?.trim() || ''
+    if (assetGroupId) {
+      settingsObj.volcengine_asset_group_id = assetGroupId
+    } else if ('volcengine_asset_group_id' in settingsObj) {
+      delete settingsObj.volcengine_asset_group_id
+    }
+  } else {
+    if ('volcengine_video_api_style' in settingsObj) {
+      delete settingsObj.volcengine_video_api_style
+    }
+    if ('volcengine_asset_auth' in settingsObj) {
+      delete settingsObj.volcengine_asset_auth
+    }
+    if ('volcengine_asset_group_id' in settingsObj) {
+      delete settingsObj.volcengine_asset_group_id
+    }
   }
 
   // megabyai (type 65): face-pass (default on) + mask params

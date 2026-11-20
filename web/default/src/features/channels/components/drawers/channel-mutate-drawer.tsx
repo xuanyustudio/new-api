@@ -244,6 +244,8 @@ function hasAdvancedSettingsValues(values: ChannelFormValues): boolean {
     values.claude_beta_query ||
     (values.volcengine_video_api_style &&
       values.volcengine_video_api_style !== 'auto') ||
+    values.volcengine_asset_auth ||
+    Boolean(values.volcengine_asset_group_id?.trim()) ||
     values.upstream_model_update_check_enabled ||
     values.upstream_model_update_auto_sync_enabled ||
     values.upstream_model_update_ignored_models?.trim()
@@ -2100,55 +2102,105 @@ export function ChannelMutateDrawer({
 
                 {/* VolcEngine / DoubaoVideo video API style */}
                 {(currentType === 45 || currentType === 54) && (
-                  <FormField
-                    control={form.control}
-                    name='volcengine_video_api_style'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Video API Protocol')}</FormLabel>
-                        <Select
-                          items={[
-                            { value: 'auto', label: t('Auto detect') },
-                            {
-                              value: 'official',
-                              label: t('VolcEngine official API'),
-                            },
-                            {
-                              value: 'openai',
-                              label: t('OpenAI-compatible API'),
-                            },
-                          ]}
-                          onValueChange={field.onChange}
-                          value={field.value || 'auto'}
-                        >
+                  <>
+                    <FormField
+                      control={form.control}
+                      name='volcengine_video_api_style'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Video API Protocol')}</FormLabel>
+                          <Select
+                            items={[
+                              { value: 'auto', label: t('Auto detect') },
+                              {
+                                value: 'official',
+                                label: t('VolcEngine official API'),
+                              },
+                              {
+                                value: 'openai',
+                                label: t('OpenAI-compatible API'),
+                              },
+                            ]}
+                            onValueChange={field.onChange}
+                            value={field.value || 'auto'}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent alignItemWithTrigger={false}>
+                              <SelectGroup>
+                                <SelectItem value='auto'>
+                                  {t('Auto detect')}
+                                </SelectItem>
+                                <SelectItem value='official'>
+                                  {t('VolcEngine official API')}
+                                </SelectItem>
+                                <SelectItem value='openai'>
+                                  {t('OpenAI-compatible API')}
+                                </SelectItem>
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            {t(
+                              'For third-party proxies using VolcEngine protocol, choose official API or append /api/v3 to the base URL. OpenAI-compatible uses /v1/video/generations.'
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name='volcengine_asset_auth'
+                      render={({ field }) => (
+                        <FormItem className='flex items-center justify-between gap-4'>
+                          <div className='space-y-1'>
+                            <FormLabel>
+                              {t('Asset authentication before create')}
+                            </FormLabel>
+                            <FormDescription>
+                              {t(
+                                'When enabled, image, video, and audio URLs are registered through the asset API and replaced with asset:// IDs before the video task is created. Existing asset:// values are kept. Leave the group ID empty to auto-create one group per channel.'
+                              )}
+                            </FormDescription>
+                          </div>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
+                            <Switch
+                              checked={field.value === true}
+                              onCheckedChange={field.onChange}
+                            />
                           </FormControl>
-                          <SelectContent alignItemWithTrigger={false}>
-                            <SelectGroup>
-                              <SelectItem value='auto'>
-                                {t('Auto detect')}
-                              </SelectItem>
-                              <SelectItem value='official'>
-                                {t('VolcEngine official API')}
-                              </SelectItem>
-                              <SelectItem value='openai'>
-                                {t('OpenAI-compatible API')}
-                              </SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          {t(
-                            'For third-party proxies using VolcEngine protocol, choose official API or append /api/v3 to the base URL. OpenAI-compatible uses /v1/video/generations.'
-                          )}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
+                        </FormItem>
+                      )}
+                    />
+                    {form.watch('volcengine_asset_auth') === true && (
+                      <FormField
+                        control={form.control}
+                        name='volcengine_asset_group_id'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('Asset group ID')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder='group-20260520175050-cskhp'
+                                {...field}
+                                value={field.value || ''}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              {t(
+                                'Optional. Example: group-20260520175050-cskhp. Empty means auto-create and reuse.'
+                              )}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     )}
-                  />
+                  </>
                 )}
 
                 {/* Coze (type 49) */}

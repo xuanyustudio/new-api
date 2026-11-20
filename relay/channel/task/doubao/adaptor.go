@@ -66,8 +66,8 @@ type requestPayload struct {
 
 type responseTask struct {
 	ID      dto.StringValue `json:"id"`
-	Model   string `json:"model"`
-	Status  string `json:"status"`
+	Model   string          `json:"model"`
+	Status  string          `json:"status"`
 	Content struct {
 		VideoURL string `json:"video_url"`
 	} `json:"content"`
@@ -101,10 +101,17 @@ type responseTask struct {
 
 type TaskAdaptor struct {
 	taskcommon.BaseBilling
-	ChannelType   int
-	apiKey        string
-	baseURL       string
-	videoAPIStyle string
+	ChannelType       int
+	apiKey            string
+	baseURL           string
+	videoAPIStyle     string
+	assetAuth         bool
+	assetGroupID      string
+	channelID         int
+	proxy             string
+	assetHTTP         *http.Client
+	assetPollInterval time.Duration
+	assetPollTimeout  time.Duration
 }
 
 func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
@@ -112,6 +119,10 @@ func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 	a.baseURL = info.ChannelBaseUrl
 	a.apiKey = info.ApiKey
 	a.videoAPIStyle = info.ChannelOtherSettings.VolcengineVideoAPIStyle
+	a.assetAuth = volcAssetAuthEnabled(info.ChannelOtherSettings)
+	a.assetGroupID = strings.TrimSpace(info.ChannelOtherSettings.VolcengineAssetGroupID)
+	a.channelID = info.ChannelId
+	a.proxy = info.ChannelSetting.Proxy
 }
 
 // ValidateRequestAndSetAction parses body, validates fields and sets default action.
@@ -245,6 +256,9 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	body, err := a.convertToRequestPayload(&req)
 	if err != nil {
 		return nil, errors.Wrap(err, "convert request payload failed")
+	}
+	if err := a.applyAssetAuth(requestContext(c), body); err != nil {
+		return nil, errors.Wrap(err, "asset auth failed")
 	}
 	if info.IsModelMapped {
 		body.Model = info.UpstreamModelName
